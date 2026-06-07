@@ -1570,6 +1570,60 @@ overlay. Null-safe.}];
   let Args = [Arg<"VTableOverlay*", "overlay">];
 }
 
+// --- Thunk catalog: process-wide registry of (R, Args...) thunk rows ---
+//
+// The hot-path templates live in CppInterOp/CppInterOpThunks.h and are
+// instantiated in each caller's TU so the binding's marshaling code is
+// visible to codegen. The runtime registry below holds the published
+// pointer arrays; bindings publish through CppImpl::Thunks::RegisterCatalogRow
+// (a template) which forwards to RegisterThunkRow.
+
+def RegisterThunkRow : CppInterOpAPI {
+  let Doc = [{Publish a row of slot thunks under \c (traits_id, signature).
+Bindings call this from a TU-scope initializer; downstream libraries do
+the same to extend the catalog without modifying CppInterOp. Keys are
+namespaced by \c traits_id (typically `typeid(Traits).name()`) so distinct
+bindings registering the same signature do not collide.
+\param[in] traits_id Stable, process-wide identifier of the HandlerTraits.
+\param[in] signature Canonical method-signature string (see MethodSignature).
+\param[in] slots     Pointer array; one entry per overlay slot.
+\param[in] n         Length of \c slots; rows shorter than kMaxOverlaySlots
+                     get zero-padded.}];
+  let NoCWrapper = true;
+  let ReturnType = "void";
+  let Args = [
+    Arg<"const char*", "traits_id">,
+    Arg<"const char*", "signature">,
+    Arg<"const void* const*", "slots">,
+    Arg<"std::size_t", "n">
+  ];
+}
+
+def LookupThunk : CppInterOpAPI {
+  let Doc = [{Look up a thunk previously published via RegisterThunkRow.
+Builds the canonical signature string for \c method (see MethodSignature)
+and returns the entry at \c slot of the row keyed by \c (traits_id, sig).
+\returns nullptr on miss (no row for the signature, or slot out of range).}];
+  let NoCWrapper = true;
+  let ReturnType = "void*";
+  let Args = [
+    Arg<"const char*", "traits_id">,
+    Arg<"TCppFunction_t", "method">,
+    Arg<"std::size_t", "slot">
+  ];
+}
+
+def MethodSignature : CppInterOpAPI {
+  let Doc = [{Canonical signature string for \c method:
+"<ret> (<arg>,<arg>,...)" using the same form RegisterThunkRow consumes.
+Bindings use this to compute lookup keys at class-creation time and
+should also use it to format the signature strings they pass to
+RegisterCatalogRow.}];
+  let NoCWrapper = true;
+  let ReturnType = "std::string";
+  let Args = [Arg<"TCppFunction_t", "method">];
+}
+
 def IsIntegerType : CppInterOpAPI {
   let Doc = [{Checks if type has an integer representation.
 If \p s is non-null, it is set to the signedness of the type.}];

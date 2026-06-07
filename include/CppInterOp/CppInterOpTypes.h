@@ -414,6 +414,27 @@ struct VTableOverlay;
 // dangling -- do not dereference) and the cleanup_data passed at install.
 using VTableOverlayDtorHook = void (*)(void* inst, void* cleanup_data);
 
+namespace detail {
+// ABI prefix size + 1 hidden CppInterOp slot for the dtor-hook self-
+// pointer. Lives here so VTableOverlayExtraSlot below is reachable from
+// both CppInterOp.h and Dispatch.h consumers.
+#ifdef _WIN32
+inline constexpr int kVTableOverlayPrefixSize = 1 + 1;
+#else
+inline constexpr int kVTableOverlayPrefixSize = 2 + 1;
+#endif
+} // namespace detail
+
+/// Address of the i-th extra-prefix slot of an instance with an overlay
+/// installed via MakeVTableOverlay(..., n_extra_prefix_slots = N, ...).
+/// Pure vptr arithmetic, no runtime dispatch -- safe from any TU that
+/// includes CppInterOpTypes.h. Returns void*& so callers read and write
+/// through the same expression. UB if \c inst has no overlay or i >= N.
+inline void*& VTableOverlayExtraSlot(void* inst, std::size_t i) {
+  void** vptr = *reinterpret_cast<void***>(inst);
+  return vptr[-(detail::kVTableOverlayPrefixSize + 1 + static_cast<int>(i))];
+}
+
 // FIXME: Rework GetDimensions to make this enum redundant.
 namespace DimensionValue {
 enum : long int {

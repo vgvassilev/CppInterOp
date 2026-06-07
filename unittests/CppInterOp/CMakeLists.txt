@@ -51,6 +51,7 @@ add_cppinterop_unittest(CppInterOpTests
   InterpreterTest.cpp
   JitTest.cpp
   ScopeReflectionTest.cpp
+  ThunkCatalogTest.cpp
   TypeReflectionTest.cpp
   Utils.cpp
   VariableReflectionTest.cpp

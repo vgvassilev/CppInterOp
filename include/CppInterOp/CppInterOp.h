@@ -31,32 +31,6 @@ namespace CppImpl {
 // from CppInterOp.td. Do not edit this section by hand.
 #include "CppInterOp/CppInterOpDecl.inc"
 
-namespace detail {
-// Total slots before the published vtable's address point in an overlay
-// block: the ABI prefix of the underlying class (1 on MSVC --
-// complete-object-locator; 2 on Itanium -- offset-to-top + type_info)
-// plus 1 hidden slot CppInterOp interposes for the dtor-hook
-// self-pointer. Exposed only so the inline VTableOverlayExtraSlot helper
-// below can compile the offset; users should not read or write any slots
-// directly.
-#ifdef _WIN32
-inline constexpr int kVTableOverlayPrefixSize = 1 + 1;
-#else
-inline constexpr int kVTableOverlayPrefixSize = 2 + 1;
-#endif
-} // namespace detail
-
-/// Address of the i-th extra-prefix slot of an instance with an overlay
-/// installed via MakeVTableOverlay(..., n_extra_prefix_slots = N, ...).
-/// Returns a void*& so callers read and write through the same expression;
-/// this is the canonical access path -- bindings should not synthesize the
-/// vptr arithmetic themselves. Behavior is undefined if \c inst has no
-/// overlay or i >= N.
-inline void*& VTableOverlayExtraSlot(void* inst, std::size_t i) {
-  void** vptr = *reinterpret_cast<void***>(inst);
-  return vptr[-(detail::kVTableOverlayPrefixSize + 1 + static_cast<int>(i))];
-}
-
 struct VTableOverlayDeleter {
   void operator()(VTableOverlay* o) const noexcept { DestroyVTableOverlay(o); }
 };
